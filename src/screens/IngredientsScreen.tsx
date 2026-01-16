@@ -6,8 +6,9 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
+  ScrollView,
 } from 'react-native';
-import type {Ingredient} from '../types';
+import type {Ingredient, IngredientCategory} from '../types';
 
 const SAMPLE_INGREDIENTS: Ingredient[] = [
   {id: '1', name: '당근', category: 'vegetable', addedAt: new Date()},
@@ -16,10 +17,75 @@ const SAMPLE_INGREDIENTS: Ingredient[] = [
   {id: '4', name: '쌀', category: 'grain', addedAt: new Date()},
 ];
 
+type QuickIngredient = {
+  name: string;
+  category: IngredientCategory;
+};
+
+const QUICK_INGREDIENTS: Record<IngredientCategory, QuickIngredient[]> = {
+  vegetable: [
+    {name: '당근', category: 'vegetable'},
+    {name: '감자', category: 'vegetable'},
+    {name: '고구마', category: 'vegetable'},
+    {name: '브로콜리', category: 'vegetable'},
+    {name: '시금치', category: 'vegetable'},
+    {name: '애호박', category: 'vegetable'},
+    {name: '양배추', category: 'vegetable'},
+    {name: '양파', category: 'vegetable'},
+  ],
+  fruit: [
+    {name: '사과', category: 'fruit'},
+    {name: '바나나', category: 'fruit'},
+    {name: '배', category: 'fruit'},
+    {name: '아보카도', category: 'fruit'},
+  ],
+  meat: [
+    {name: '소고기', category: 'meat'},
+    {name: '닭고기', category: 'meat'},
+    {name: '돼지고기', category: 'meat'},
+  ],
+  fish: [
+    {name: '흰살생선', category: 'fish'},
+    {name: '연어', category: 'fish'},
+    {name: '새우', category: 'fish'},
+  ],
+  dairy: [
+    {name: '분유', category: 'dairy'},
+    {name: '치즈', category: 'dairy'},
+    {name: '요거트', category: 'dairy'},
+  ],
+  grain: [
+    {name: '쌀', category: 'grain'},
+    {name: '찹쌀', category: 'grain'},
+    {name: '오트밀', category: 'grain'},
+  ],
+  other: [
+    {name: '달걀', category: 'other'},
+    {name: '두부', category: 'other'},
+    {name: '참기름', category: 'other'},
+  ],
+};
+
+const CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
+  {key: 'vegetable', label: '채소'},
+  {key: 'fruit', label: '과일'},
+  {key: 'meat', label: '육류'},
+  {key: 'fish', label: '생선'},
+  {key: 'dairy', label: '유제품'},
+  {key: 'grain', label: '곡류'},
+  {key: 'other', label: '기타'},
+];
+
 export default function IngredientsScreen() {
   const [ingredients, setIngredients] =
     useState<Ingredient[]>(SAMPLE_INGREDIENTS);
   const [newIngredient, setNewIngredient] = useState('');
+  const [selectedCategory, setSelectedCategory] =
+    useState<IngredientCategory>('vegetable');
+
+  const isIngredientAdded = (name: string) => {
+    return ingredients.some(item => item.name === name);
+  };
 
   const addIngredient = () => {
     if (newIngredient.trim()) {
@@ -32,6 +98,19 @@ export default function IngredientsScreen() {
       setIngredients([...ingredients, ingredient]);
       setNewIngredient('');
     }
+  };
+
+  const addQuickIngredient = (quick: QuickIngredient) => {
+    if (isIngredientAdded(quick.name)) {
+      return;
+    }
+    const ingredient: Ingredient = {
+      id: Date.now().toString(),
+      name: quick.name,
+      category: quick.category,
+      addedAt: new Date(),
+    };
+    setIngredients([...ingredients, ingredient]);
   };
 
   const removeIngredient = (id: string) => {
@@ -56,12 +135,66 @@ export default function IngredientsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 자주 쓰는 재료 섹션 */}
+      <View style={styles.quickSection}>
+        <Text style={styles.quickSectionTitle}>자주 쓰는 재료</Text>
+
+        {/* 카테고리 탭 */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryTabs}
+          contentContainerStyle={styles.categoryTabsContent}>
+          {CATEGORY_TABS.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[
+                styles.categoryTab,
+                selectedCategory === tab.key && styles.categoryTabActive,
+              ]}
+              onPress={() => setSelectedCategory(tab.key)}>
+              <Text
+                style={[
+                  styles.categoryTabText,
+                  selectedCategory === tab.key && styles.categoryTabTextActive,
+                ]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* 퀵 선택 버튼들 */}
+        <View style={styles.quickButtons}>
+          {QUICK_INGREDIENTS[selectedCategory].map(item => {
+            const added = isIngredientAdded(item.name);
+            return (
+              <TouchableOpacity
+                key={item.name}
+                style={[styles.quickButton, added && styles.quickButtonAdded]}
+                onPress={() => addQuickIngredient(item)}
+                disabled={added}>
+                <Text
+                  style={[
+                    styles.quickButtonText,
+                    added && styles.quickButtonTextAdded,
+                  ]}>
+                  {item.name}
+                </Text>
+                {added && <Text style={styles.checkMark}>✓</Text>}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* 직접 입력 섹션 */}
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
           value={newIngredient}
           onChangeText={setNewIngredient}
-          placeholder="식재료 이름을 입력하세요"
+          placeholder="직접 입력하기"
           placeholderTextColor="#999"
           onSubmitEditing={addIngredient}
         />
@@ -69,6 +202,11 @@ export default function IngredientsScreen() {
           <Text style={styles.addButtonText}>추가</Text>
         </TouchableOpacity>
       </View>
+
+      {/* 내 식재료 목록 */}
+      <Text style={styles.myIngredientsTitle}>
+        내 식재료 ({ingredients.length})
+      </Text>
 
       <FlatList
         data={ingredients}
@@ -105,6 +243,80 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFF9F0',
+  },
+  quickSection: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0E6D8',
+  },
+  quickSectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    paddingHorizontal: 16,
+    marginBottom: 12,
+  },
+  categoryTabs: {
+    marginBottom: 12,
+  },
+  categoryTabsContent: {
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  categoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+  },
+  categoryTabActive: {
+    backgroundColor: '#FF6B35',
+  },
+  categoryTabText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  categoryTabTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  quickButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  quickButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#FFE4D6',
+    gap: 4,
+  },
+  quickButtonAdded: {
+    backgroundColor: '#E8E8E8',
+  },
+  quickButtonText: {
+    fontSize: 14,
+    color: '#FF6B35',
+  },
+  quickButtonTextAdded: {
+    color: '#999',
+  },
+  checkMark: {
+    fontSize: 12,
+    color: '#999',
+  },
+  myIngredientsTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
