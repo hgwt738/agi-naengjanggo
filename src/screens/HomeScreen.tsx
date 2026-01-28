@@ -175,23 +175,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.menuCard}
-            onPress={() => navigation.navigate('Recipes')}>
-            <Text style={styles.menuIcon}>🍳</Text>
-            <Text style={styles.menuTitle}>레시피 찾기</Text>
-            <Text style={styles.menuDescription}>
-              식재료로 만들 수 있는 이유식을 찾아봐요
-            </Text>
+            style={[styles.menuCard, styles.menuCardDisabled]}
+            disabled>
+            <Text style={styles.menuIcon}>⚙️</Text>
+            <Text style={styles.menuTitle}>설정</Text>
+            <Text style={styles.menuDescription}>준비 중이에요</Text>
           </TouchableOpacity>
         </View>
-
-        <TouchableOpacity
-          style={[styles.menuCard, styles.menuCardFull, styles.menuCardDisabled]}
-          disabled>
-          <Text style={styles.menuIcon}>⚙️</Text>
-          <Text style={styles.menuTitle}>설정</Text>
-          <Text style={styles.menuDescription}>준비 중이에요</Text>
-        </TouchableOpacity>
       </View>
       </ScrollView>
     </SafeAreaView>

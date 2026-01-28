@@ -8,7 +8,10 @@ import {
   TextInput,
   ScrollView,
 } from 'react-native';
+import {useNavigation} from '@react-navigation/native';
+import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {Ingredient, IngredientCategory} from '../types';
+import type {RootStackParamList} from '../types/navigation';
 
 const SAMPLE_INGREDIENTS: Ingredient[] = [
   {id: '1', name: '당근', category: 'vegetable', addedAt: new Date()},
@@ -77,6 +80,8 @@ const CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
 ];
 
 export default function IngredientsScreen() {
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [ingredients, setIngredients] =
     useState<Ingredient[]>(SAMPLE_INGREDIENTS);
   const [newIngredient, setNewIngredient] = useState('');
@@ -222,6 +227,21 @@ export default function IngredientsScreen() {
           </View>
         }
       />
+
+      {/* 레시피 생성 버튼 */}
+      <View style={styles.generateButtonContainer}>
+        <TouchableOpacity
+          style={[
+            styles.generateButton,
+            ingredients.length === 0 && styles.generateButtonDisabled,
+          ]}
+          disabled={ingredients.length === 0}
+          onPress={() => navigation.navigate('Recipes')}>
+          <Text style={styles.generateButtonText}>
+            🍳 레시피 생성 ({ingredients.length}개 재료)
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -392,5 +412,30 @@ const styles = StyleSheet.create({
   emptySubtext: {
     fontSize: 14,
     color: '#999',
+  },
+  generateButtonContainer: {
+    padding: 16,
+    paddingBottom: 32,
+    backgroundColor: '#FFF9F0',
+  },
+  generateButton: {
+    backgroundColor: '#FF6B35',
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  generateButtonDisabled: {
+    backgroundColor: '#CCC',
+    shadowOpacity: 0,
+  },
+  generateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '700',
   },
 });
