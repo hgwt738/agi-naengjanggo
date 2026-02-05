@@ -1,23 +1,25 @@
-import React, {useState} from 'react';
+import React, {useState, useMemo} from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   TextInput,
   ScrollView,
+  Modal,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {Ingredient, IngredientCategory} from '../types';
 import type {RootStackParamList} from '../types/navigation';
 
 const SAMPLE_INGREDIENTS: Ingredient[] = [
-  {id: '1', name: '당근', category: 'vegetable', addedAt: new Date()},
-  {id: '2', name: '감자', category: 'vegetable', addedAt: new Date()},
-  {id: '3', name: '소고기', category: 'meat', addedAt: new Date()},
-  {id: '4', name: '쌀', category: 'grain', addedAt: new Date()},
+  {id: '1', name: '브로콜리', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)},
+  {id: '2', name: '고구마', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000)},
+  {id: '3', name: '닭가슴살', category: 'meat', addedAt: new Date(), expiresAt: new Date()},
+  {id: '4', name: '두부', category: 'other', addedAt: new Date(), expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)},
+  {id: '5', name: '퀴노아', category: 'grain', addedAt: new Date(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)},
 ];
 
 type QuickIngredient = {
@@ -69,7 +71,27 @@ const QUICK_INGREDIENTS: Record<IngredientCategory, QuickIngredient[]> = {
   ],
 };
 
-const CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
+type FilterTab = 'all' | IngredientCategory;
+
+const FILTER_TABS: {key: FilterTab; label: string}[] = [
+  {key: 'all', label: '전체'},
+  {key: 'vegetable', label: '채소'},
+  {key: 'meat', label: '단백질'},
+  {key: 'grain', label: '곡류'},
+  {key: 'fruit', label: '과일'},
+];
+
+const CATEGORY_EMOJI: Record<IngredientCategory, string> = {
+  vegetable: '🥬',
+  fruit: '🍎',
+  meat: '🍖',
+  fish: '🐟',
+  dairy: '🥛',
+  grain: '🌾',
+  other: '🥄',
+};
+
+const ADD_CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
   {key: 'vegetable', label: '채소'},
   {key: 'fruit', label: '과일'},
   {key: 'meat', label: '육류'},
@@ -84,9 +106,11 @@ export default function IngredientsScreen() {
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [ingredients, setIngredients] =
     useState<Ingredient[]>(SAMPLE_INGREDIENTS);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState<FilterTab>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newIngredient, setNewIngredient] = useState('');
-  const [selectedCategory, setSelectedCategory] =
-    useState<IngredientCategory>('vegetable');
+  const [addCategory, setAddCategory] = useState<IngredientCategory>('vegetable');
 
   const isIngredientAdded = (name: string) => {
     return ingredients.some(item => item.name === name);
@@ -97,8 +121,9 @@ export default function IngredientsScreen() {
       const ingredient: Ingredient = {
         id: Date.now().toString(),
         name: newIngredient.trim(),
-        category: 'other',
+        category: addCategory,
         addedAt: new Date(),
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       };
       setIngredients([...ingredients, ingredient]);
       setNewIngredient('');
@@ -114,6 +139,7 @@ export default function IngredientsScreen() {
       name: quick.name,
       category: quick.category,
       addedAt: new Date(),
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
     setIngredients([...ingredients, ingredient]);
   };
@@ -122,127 +148,294 @@ export default function IngredientsScreen() {
     setIngredients(ingredients.filter(item => item.id !== id));
   };
 
-  const renderItem = ({item}: {item: Ingredient}) => (
-    <View style={styles.ingredientItem}>
-      <View style={styles.ingredientInfo}>
-        <Text style={styles.ingredientName}>{item.name}</Text>
-        <Text style={styles.ingredientCategory}>
-          {getCategoryLabel(item.category)}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.removeButton}
-        onPress={() => removeIngredient(item.id)}>
-        <Text style={styles.removeButtonText}>삭제</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const getExpiryStatus = (expiresAt?: Date) => {
+    if (!expiresAt) return {text: '유통기한 없음', color: '#8d6a5e', icon: '📅'};
+
+    const now = new Date();
+    const diffTime = expiresAt.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= 0) {
+      return {text: '오늘 만료', color: '#ef4444', icon: '⚠️'};
+    } else if (diffDays <= 3) {
+      return {text: `${diffDays}일 남음`, color: '#f97316', icon: '⏰'};
+    } else if (diffDays > 30) {
+      return {text: '30일+ 남음', color: '#22c55e', icon: '✓'};
+    } else {
+      return {text: `${diffDays}일 남음`, color: '#22c55e', icon: '✓'};
+    }
+  };
+
+  // 필터링된 식재료
+  const filteredIngredients = useMemo(() => {
+    let filtered = ingredients;
+
+    // 카테고리 필터
+    if (selectedFilter !== 'all') {
+      if (selectedFilter === 'meat') {
+        // 단백질 = meat + fish + other(두부 등)
+        filtered = filtered.filter(item =>
+          item.category === 'meat' || item.category === 'fish' || item.category === 'other'
+        );
+      } else {
+        filtered = filtered.filter(item => item.category === selectedFilter);
+      }
+    }
+
+    // 검색 필터
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(item =>
+        item.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [ingredients, selectedFilter, searchQuery]);
+
+  // 카테고리별로 그룹화
+  const groupedIngredients = useMemo(() => {
+    const groups: Record<string, Ingredient[]> = {};
+
+    filteredIngredients.forEach(item => {
+      const category = getCategoryLabel(item.category);
+      if (!groups[category]) {
+        groups[category] = [];
+      }
+      groups[category].push(item);
+    });
+
+    return groups;
+  }, [filteredIngredients]);
 
   return (
-    <View style={styles.container}>
-      {/* 자주 쓰는 재료 섹션 */}
-      <View style={styles.quickSection}>
-        <Text style={styles.quickSectionTitle}>자주 쓰는 재료</Text>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Top Navigation Bar */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}>
+          <Text style={styles.backIcon}>←</Text>
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>내 냉장고</Text>
+        <TouchableOpacity style={styles.moreButton}>
+          <Text style={styles.moreIcon}>⋯</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* 카테고리 탭 */}
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="식재료 검색..."
+            placeholderTextColor="#8d6a5e"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+        </View>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.tabsContainer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.categoryTabs}
-          contentContainerStyle={styles.categoryTabsContent}>
-          {CATEGORY_TABS.map(tab => (
+          contentContainerStyle={styles.tabsContent}>
+          {FILTER_TABS.map(tab => (
             <TouchableOpacity
               key={tab.key}
               style={[
-                styles.categoryTab,
-                selectedCategory === tab.key && styles.categoryTabActive,
+                styles.tab,
+                selectedFilter === tab.key && styles.tabActive,
               ]}
-              onPress={() => setSelectedCategory(tab.key)}>
+              onPress={() => setSelectedFilter(tab.key)}>
               <Text
                 style={[
-                  styles.categoryTabText,
-                  selectedCategory === tab.key && styles.categoryTabTextActive,
+                  styles.tabText,
+                  selectedFilter === tab.key && styles.tabTextActive,
                 ]}>
                 {tab.label}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        {/* 퀵 선택 버튼들 */}
-        <View style={styles.quickButtons}>
-          {QUICK_INGREDIENTS[selectedCategory].map(item => {
-            const added = isIngredientAdded(item.name);
-            return (
-              <TouchableOpacity
-                key={item.name}
-                style={[styles.quickButton, added && styles.quickButtonAdded]}
-                onPress={() => addQuickIngredient(item)}
-                disabled={added}>
-                <Text
-                  style={[
-                    styles.quickButtonText,
-                    added && styles.quickButtonTextAdded,
-                  ]}>
-                  {item.name}
-                </Text>
-                {added && <Text style={styles.checkMark}>✓</Text>}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
       </View>
 
-      {/* 직접 입력 섹션 */}
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={newIngredient}
-          onChangeText={setNewIngredient}
-          placeholder="직접 입력하기"
-          placeholderTextColor="#999"
-          onSubmitEditing={addIngredient}
-        />
-        <TouchableOpacity style={styles.addButton} onPress={addIngredient}>
-          <Text style={styles.addButtonText}>추가</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Content Area */}
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {Object.entries(groupedIngredients).map(([category, items]) => (
+          <View key={category} style={styles.categorySection}>
+            <View style={styles.categoryHeader}>
+              <Text style={styles.categoryTitle}>{category}</Text>
+              <View style={styles.categoryBadge}>
+                <Text style={styles.categoryBadgeText}>{items.length}개</Text>
+              </View>
+            </View>
 
-      {/* 내 식재료 목록 */}
-      <Text style={styles.myIngredientsTitle}>
-        내 식재료 ({ingredients.length})
-      </Text>
+            <View style={styles.ingredientList}>
+              {items.map(item => {
+                const expiry = getExpiryStatus(item.expiresAt);
+                return (
+                  <View key={item.id} style={styles.ingredientCard}>
+                    <View style={styles.ingredientImage}>
+                      <Text style={styles.ingredientEmoji}>
+                        {CATEGORY_EMOJI[item.category]}
+                      </Text>
+                    </View>
+                    <View style={styles.ingredientInfo}>
+                      <Text style={styles.ingredientName}>{item.name}</Text>
+                      <View style={styles.expiryRow}>
+                        <Text style={styles.expiryIcon}>{expiry.icon}</Text>
+                        <Text style={[styles.expiryText, {color: expiry.color}]}>
+                          {expiry.text}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.ingredientActions}>
+                      <TouchableOpacity style={styles.actionButton}>
+                        <Text style={styles.editIcon}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => removeIngredient(item.id)}>
+                        <Text style={styles.deleteIcon}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))}
 
-      <FlatList
-        data={ingredients}
-        renderItem={renderItem}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
+        {filteredIngredients.length === 0 && (
           <View style={styles.emptyContainer}>
+            <Text style={styles.emptyEmoji}>🧊</Text>
             <Text style={styles.emptyText}>등록된 식재료가 없어요</Text>
             <Text style={styles.emptySubtext}>
-              위에서 식재료를 추가해보세요!
+              + 버튼을 눌러 식재료를 추가해보세요
             </Text>
           </View>
-        }
-      />
+        )}
 
-      {/* 레시피 생성 버튼 */}
-      <View style={styles.generateButtonContainer}>
+        <View style={styles.bottomSpacer} />
+      </ScrollView>
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}>
+        <Text style={styles.fabIcon}>+</Text>
+      </TouchableOpacity>
+
+      {/* Bottom Tab Bar */}
+      <View style={styles.bottomNav}>
+        <TouchableOpacity style={styles.navItem}>
+          <Text style={styles.navIconActive}>🧊</Text>
+          <Text style={styles.navLabelActive}>냉장고</Text>
+        </TouchableOpacity>
         <TouchableOpacity
-          style={[
-            styles.generateButton,
-            ingredients.length === 0 && styles.generateButtonDisabled,
-          ]}
-          disabled={ingredients.length === 0}
+          style={styles.navItem}
           onPress={() => navigation.navigate('Recipes')}>
-          <Text style={styles.generateButtonText}>
-            🍳 레시피 생성 ({ingredients.length}개 재료)
-          </Text>
+          <Text style={styles.navIcon}>📖</Text>
+          <Text style={styles.navLabel}>레시피</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Text style={styles.navIcon}>🛒</Text>
+          <Text style={styles.navLabel}>장보기</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navItem}>
+          <Text style={styles.navIcon}>👤</Text>
+          <Text style={styles.navLabel}>프로필</Text>
         </TouchableOpacity>
       </View>
-    </View>
+
+      {/* Add Ingredient Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowAddModal(false)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowAddModal(false)}>
+                <Text style={styles.modalCancel}>취소</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>식재료 추가</Text>
+              <TouchableOpacity onPress={() => {
+                addIngredient();
+                setShowAddModal(false);
+              }}>
+                <Text style={styles.modalConfirm}>완료</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 직접 입력 */}
+            <View style={styles.modalInputContainer}>
+              <TextInput
+                style={styles.modalInput}
+                value={newIngredient}
+                onChangeText={setNewIngredient}
+                placeholder="직접 입력하기"
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {/* 카테고리 탭 */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.modalCategoryTabs}
+              contentContainerStyle={styles.modalCategoryTabsContent}>
+              {ADD_CATEGORY_TABS.map(tab => (
+                <TouchableOpacity
+                  key={tab.key}
+                  style={[
+                    styles.modalCategoryTab,
+                    addCategory === tab.key && styles.modalCategoryTabActive,
+                  ]}
+                  onPress={() => setAddCategory(tab.key)}>
+                  <Text
+                    style={[
+                      styles.modalCategoryTabText,
+                      addCategory === tab.key && styles.modalCategoryTabTextActive,
+                    ]}>
+                    {tab.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+
+            {/* 퀵 선택 버튼들 */}
+            <ScrollView style={styles.quickScrollView}>
+              <View style={styles.quickButtons}>
+                {QUICK_INGREDIENTS[addCategory].map(item => {
+                  const added = isIngredientAdded(item.name);
+                  return (
+                    <TouchableOpacity
+                      key={item.name}
+                      style={[styles.quickButton, added && styles.quickButtonAdded]}
+                      onPress={() => addQuickIngredient(item)}
+                      disabled={added}>
+                      <Text
+                        style={[
+                          styles.quickButtonText,
+                          added && styles.quickButtonTextAdded,
+                        ]}>
+                        {item.name}
+                      </Text>
+                      {added && <Text style={styles.checkMark}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
@@ -262,56 +455,357 @@ function getCategoryLabel(category: Ingredient['category']): string {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFF9F0',
+    backgroundColor: '#f8f6f5',
   },
-  quickSection: {
+  // Header
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  backButton: {
+    width: 48,
+    height: 48,
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+  },
+  backIcon: {
+    fontSize: 28,
+    color: '#181210',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#181210',
+  },
+  moreButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moreIcon: {
+    fontSize: 24,
+    color: '#181210',
+  },
+  // Search
+  searchContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0E6D8',
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    height: 48,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 228, 214, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
   },
-  quickSectionTitle: {
+  searchIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#181210',
+  },
+  // Tabs
+  tabsContainer: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 228, 214, 0.2)',
+  },
+  tabsContent: {
+    paddingHorizontal: 16,
+    gap: 24,
+  },
+  tab: {
+    paddingVertical: 12,
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#FF6B35',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#8d6a5e',
+  },
+  tabTextActive: {
+    color: '#FF6B35',
+  },
+  // Content
+  content: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  categorySection: {
+    marginTop: 24,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  categoryTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#181210',
+  },
+  categoryBadge: {
+    backgroundColor: 'rgba(255, 107, 53, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FF6B35',
+  },
+  ingredientList: {
+    gap: 12,
+  },
+  ingredientCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 228, 214, 0.4)',
+    padding: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 228, 214, 0.2)',
+  },
+  ingredientImage: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  ingredientEmoji: {
+    fontSize: 28,
+  },
+  ingredientInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  ingredientName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#181210',
+  },
+  expiryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 4,
+  },
+  expiryIcon: {
+    fontSize: 12,
+  },
+  expiryText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  ingredientActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editIcon: {
+    fontSize: 14,
+  },
+  deleteIcon: {
+    fontSize: 14,
+    color: '#f87171',
+  },
+  // Empty State
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyEmoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#333',
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    color: '#181210',
+    marginBottom: 4,
   },
-  categoryTabs: {
-    marginBottom: 12,
+  emptySubtext: {
+    fontSize: 14,
+    color: '#8d6a5e',
   },
-  categoryTabsContent: {
+  bottomSpacer: {
+    height: 160,
+  },
+  // FAB
+  fab: {
+    position: 'absolute',
+    bottom: 100,
+    right: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FF6B35',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabIcon: {
+    fontSize: 32,
+    color: '#FFFFFF',
+    fontWeight: '300',
+  },
+  // Bottom Navigation
+  bottomNav: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 12,
+    paddingBottom: 28,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 228, 214, 0.3)',
+  },
+  navItem: {
+    alignItems: 'center',
+    gap: 4,
+  },
+  navIcon: {
+    fontSize: 24,
+    opacity: 0.5,
+  },
+  navIconActive: {
+    fontSize: 24,
+  },
+  navLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8d6a5e',
+  },
+  navLabelActive: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#FF6B35',
+  },
+  // Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#181210',
+  },
+  modalCancel: {
+    fontSize: 16,
+    color: '#8d6a5e',
+  },
+  modalConfirm: {
+    fontSize: 16,
+    color: '#FF6B35',
+    fontWeight: '600',
+  },
+  modalInputContainer: {
+    padding: 16,
+  },
+  modalInput: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+  },
+  modalCategoryTabs: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalCategoryTabsContent: {
     paddingHorizontal: 12,
     gap: 8,
   },
-  categoryTab: {
+  modalCategoryTab: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
     borderRadius: 20,
-    backgroundColor: '#F5F5F5',
   },
-  categoryTabActive: {
+  modalCategoryTabActive: {
     backgroundColor: '#FF6B35',
   },
-  categoryTabText: {
+  modalCategoryTabText: {
     fontSize: 14,
     color: '#666',
   },
-  categoryTabTextActive: {
+  modalCategoryTabTextActive: {
     color: '#FFFFFF',
     fontWeight: '600',
+  },
+  quickScrollView: {
+    maxHeight: 300,
   },
   quickButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    paddingHorizontal: 12,
+    padding: 16,
     gap: 8,
   },
   quickButton: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderRadius: 20,
     backgroundColor: '#FFE4D6',
     gap: 4,
@@ -322,6 +816,7 @@ const styles = StyleSheet.create({
   quickButtonText: {
     fontSize: 14,
     color: '#FF6B35',
+    fontWeight: '500',
   },
   quickButtonTextAdded: {
     color: '#999',
@@ -329,113 +824,5 @@ const styles = StyleSheet.create({
   checkMark: {
     fontSize: 12,
     color: '#999',
-  },
-  myIngredientsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 12,
-  },
-  input: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  addButton: {
-    backgroundColor: '#FF6B35',
-    borderRadius: 12,
-    paddingHorizontal: 24,
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  listContainer: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  ingredientItem: {
-    flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  ingredientInfo: {
-    flex: 1,
-  },
-  ingredientName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#333',
-  },
-  ingredientCategory: {
-    fontSize: 12,
-    color: '#888',
-    marginTop: 2,
-  },
-  removeButton: {
-    padding: 8,
-  },
-  removeButtonText: {
-    color: '#FF4444',
-    fontSize: 14,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 4,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#999',
-  },
-  generateButtonContainer: {
-    padding: 16,
-    paddingBottom: 32,
-    backgroundColor: '#FFF9F0',
-  },
-  generateButton: {
-    backgroundColor: '#FF6B35',
-    borderRadius: 16,
-    paddingVertical: 18,
-    alignItems: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#CCC',
-    shadowOpacity: 0,
-  },
-  generateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '700',
   },
 });
