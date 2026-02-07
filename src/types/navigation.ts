@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  Splash: undefined;
   Home: undefined;
   Ingredients: undefined;
   Recipes: undefined;

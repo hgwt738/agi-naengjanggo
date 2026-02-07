@@ -3,6 +3,7 @@ import {NavigationContainer} from '@react-navigation/native';
 import {createNativeStackNavigator} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../types/navigation';
 import {
+  SplashScreen,
   HomeScreen,
   IngredientsScreen,
   RecipesScreen,
@@ -15,7 +16,7 @@ export default function RootNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator
-        initialRouteName="Home"
+        initialRouteName="Splash"
         screenOptions={{
           headerStyle: {
             backgroundColor: '#FF6B35',
@@ -28,6 +29,11 @@ export default function RootNavigator() {
             backgroundColor: '#FFF9F0',
           },
         }}>
+        <Stack.Screen
+          name="Splash"
+          component={SplashScreen}
+          options={{headerShown: false}}
+        />
         <Stack.Screen
           name="Home"
           component={HomeScreen}
