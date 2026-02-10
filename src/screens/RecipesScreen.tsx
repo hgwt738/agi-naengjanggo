@@ -1,88 +1,24 @@
-import React, {useState} from 'react';
+import React, {useState, useCallback} from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../types/navigation';
-import type {Recipe, AgeGroup} from '../types';
+import type {AgeGroup} from '../types';
+import {getAllRecipes} from '../constants/recipeData';
+import {matchRecipes, type MatchedRecipe} from '../utils/recipeMatching';
+import {loadIngredients} from '../utils/ingredientStorage';
 
 type RecipesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Recipes'>;
-
-interface ExtendedRecipe extends Recipe {
-  imageUrl?: string;
-  cookingMethod?: string;
-  matchPercentage?: number;
-  availableIngredients?: string[];
-  missingIngredients?: string[];
-  isBookmarked?: boolean;
-}
-
-const SAMPLE_RECIPES: ExtendedRecipe[] = [
-  {
-    id: '1',
-    name: '고구마 사과 매쉬',
-    description: '베타카로틴이 풍부한 달콤하고 부드러운 퓨레',
-    ingredients: ['고구마', '사과', '모유/분유'],
-    ageGroup: '초기',
-    cookingTime: 15,
-    difficulty: 'easy',
-    cookingMethod: '찌기',
-    matchPercentage: 90,
-    availableIngredients: ['고구마', '사과'],
-    missingIngredients: ['모유/분유'],
-    isBookmarked: true,
-  },
-  {
-    id: '2',
-    name: '브로콜리 배 퓨레',
-    description: '영양이 가득한 초록 채소 퓨레',
-    ingredients: ['브로콜리', '배'],
-    ageGroup: '초기',
-    cookingTime: 10,
-    difficulty: 'easy',
-    cookingMethod: '삶기',
-    matchPercentage: 100,
-    availableIngredients: ['브로콜리', '배'],
-    missingIngredients: [],
-    isBookmarked: false,
-  },
-  {
-    id: '3',
-    name: '아보카도 바나나 매쉬',
-    description: '건강한 지방이 풍부한 무조리 레시피',
-    ingredients: ['아보카도', '바나나'],
-    ageGroup: '초기',
-    cookingTime: 5,
-    difficulty: 'easy',
-    cookingMethod: '무조리',
-    matchPercentage: 50,
-    availableIngredients: ['바나나'],
-    missingIngredients: ['아보카도'],
-    isBookmarked: false,
-  },
-  {
-    id: '4',
-    name: '소고기 야채죽',
-    description: '단백질과 야채가 듬뿍 들어간 영양죽',
-    ingredients: ['소고기', '당근', '감자', '쌀'],
-    ageGroup: '중기',
-    cookingTime: 40,
-    difficulty: 'medium',
-    cookingMethod: '끓이기',
-    matchPercentage: 75,
-    availableIngredients: ['당근', '감자', '쌀'],
-    missingIngredients: ['소고기'],
-    isBookmarked: false,
-  },
-];
 
 const AGE_STAGES: {key: AgeGroup | 'all'; label: string; subLabel?: string}[] = [
   {key: 'all', label: '전체'},
@@ -96,26 +32,37 @@ export default function RecipesScreen() {
   const navigation = useNavigation<RecipesScreenNavigationProp>();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStage, setSelectedStage] = useState<AgeGroup | 'all'>('all');
-  const [recipes] = useState<ExtendedRecipe[]>(SAMPLE_RECIPES);
+  const [matchedRecipes, setMatchedRecipes] = useState<MatchedRecipe[]>([]);
 
-  const filteredRecipes = recipes.filter(recipe => {
-    const matchesStage = selectedStage === 'all' || recipe.ageGroup === selectedStage;
-    const matchesSearch = recipe.name.toLowerCase().includes(searchQuery.toLowerCase());
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const ingredients = await loadIngredients();
+        const userNames = ingredients.map(i => i.name);
+        const allRecipes = getAllRecipes();
+        const matched = matchRecipes(allRecipes, userNames);
+        setMatchedRecipes(matched);
+      })();
+    }, []),
+  );
+
+  const filteredRecipes = matchedRecipes.filter(item => {
+    const matchesStage = selectedStage === 'all' || item.recipe.ageGroup === selectedStage;
+    const matchesSearch = item.recipe.name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesStage && matchesSearch;
   });
 
-  const getMatchColor = (percentage?: number) => {
-    if (!percentage) return '#8d6a5e';
+  const getMatchColor = (percentage: number) => {
     if (percentage === 100) return '#22c55e';
     if (percentage >= 70) return '#FF6B35';
     return '#8d6a5e';
   };
 
-  const getMatchText = (percentage?: number) => {
-    if (!percentage) return '';
+  const getMatchText = (percentage: number) => {
     if (percentage === 100) return '100% 매칭: 바로 조리 가능!';
     if (percentage >= 70) return `${percentage}% 재료 매칭`;
-    return '일부 재료 매칭';
+    if (percentage > 0) return `${percentage}% 재료 매칭`;
+    return '재료 없음';
   };
 
   return (
@@ -165,9 +112,6 @@ export default function RecipesScreen() {
         <Text style={styles.metaText}>
           {filteredRecipes.length}개의 레시피가 재료와 매칭됨
         </Text>
-        <TouchableOpacity>
-          <Text style={styles.filterIcon}>⚙️</Text>
-        </TouchableOpacity>
       </View>
 
       {/* Recipe Cards */}
@@ -175,7 +119,7 @@ export default function RecipesScreen() {
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}>
-        {filteredRecipes.map(recipe => (
+        {filteredRecipes.map(({recipe, matchPercentage, availableIngredients, missingIngredients}) => (
           <TouchableOpacity
             key={recipe.id}
             style={styles.recipeCard}
@@ -183,25 +127,21 @@ export default function RecipesScreen() {
             activeOpacity={0.9}>
             {/* Recipe Image */}
             <View style={styles.recipeImageContainer}>
-              <View style={styles.recipeImagePlaceholder}>
-                <Text style={styles.recipeImageEmoji}>
-                  {recipe.ageGroup === '초기' ? '🍠' : '🍲'}
-                </Text>
-              </View>
+              {recipe.image ? (
+                <Image source={recipe.image} style={styles.recipeImage} />
+              ) : (
+                <View style={styles.recipeImagePlaceholder}>
+                  <Text style={styles.recipeImageEmoji}>
+                    {recipe.emoji}
+                  </Text>
+                </View>
+              )}
             </View>
 
             {/* Recipe Info */}
             <View style={styles.recipeInfo}>
               <View style={styles.recipeHeader}>
                 <Text style={styles.recipeName}>{recipe.name}</Text>
-                <TouchableOpacity>
-                  <Text style={[
-                    styles.bookmarkIcon,
-                    recipe.isBookmarked && styles.bookmarkIconActive
-                  ]}>
-                    {recipe.isBookmarked ? '🔖' : '🏷️'}
-                  </Text>
-                </TouchableOpacity>
               </View>
 
               {/* Cooking Info */}
@@ -216,17 +156,17 @@ export default function RecipesScreen() {
 
               {/* Ingredient Tags */}
               <View style={styles.ingredientTags}>
-                {recipe.availableIngredients?.map(ing => (
+                {availableIngredients.map(ing => (
                   <View key={ing} style={styles.ingredientTagAvailable}>
                     <Text style={styles.ingredientTagAvailableText}>
-                      ✅ {ing.toUpperCase()}
+                      ✅ {ing}
                     </Text>
                   </View>
                 ))}
-                {recipe.missingIngredients?.map(ing => (
+                {missingIngredients.map(ing => (
                   <View key={ing} style={styles.ingredientTagMissing}>
                     <Text style={styles.ingredientTagMissingText}>
-                      ➕ {ing.toUpperCase()}
+                      ➕ {ing}
                     </Text>
                   </View>
                 ))}
@@ -236,20 +176,17 @@ export default function RecipesScreen() {
               <View style={styles.recipeFooter}>
                 <Text style={[
                   styles.matchText,
-                  {color: getMatchColor(recipe.matchPercentage)}
+                  {color: getMatchColor(matchPercentage)}
                 ]}>
-                  {getMatchText(recipe.matchPercentage)}
+                  {getMatchText(matchPercentage)}
                 </Text>
                 <TouchableOpacity
                   style={[
                     styles.viewButton,
-                    recipe.matchPercentage === 100 && styles.viewButtonHighlight,
+                    matchPercentage === 100 && styles.viewButtonHighlight,
                   ]}
                   onPress={() => navigation.navigate('RecipeDetail', {recipeId: recipe.id})}>
-                  <Text style={[
-                    styles.viewButtonText,
-                    recipe.matchPercentage !== 100 && styles.viewButtonTextMuted,
-                  ]}>
+                  <Text style={styles.viewButtonText}>
                     레시피 보기
                   </Text>
                 </TouchableOpacity>
@@ -260,12 +197,6 @@ export default function RecipesScreen() {
 
         <View style={styles.bottomSpacer} />
       </ScrollView>
-
-      {/* FAB */}
-      <TouchableOpacity style={styles.fab}>
-        <Text style={styles.fabIcon}>🛒</Text>
-      </TouchableOpacity>
-
     </SafeAreaView>
   );
 }
@@ -278,7 +209,7 @@ const styles = StyleSheet.create({
   // Search
   searchContainer: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 12,
   },
   searchBar: {
     flexDirection: 'row',
@@ -299,17 +230,17 @@ const styles = StyleSheet.create({
   },
   // Chips
   chipsContainer: {
-    marginTop: 8,
+    flexGrow: 0,
+    marginTop: 4,
   },
   chipsContent: {
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingVertical: 8,
   },
   chip: {
-    height: 40,
-    paddingHorizontal: 24,
-    borderRadius: 20,
+    height: 36,
+    paddingHorizontal: 20,
+    borderRadius: 18,
     backgroundColor: '#f5f1f0',
     alignItems: 'center',
     justifyContent: 'center',
@@ -338,23 +269,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingBottom: 4,
   },
   metaText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#8d6a5e',
   },
-  filterIcon: {
-    fontSize: 18,
-  },
   // Content
   content: {
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    gap: 16,
+    padding: 12,
+    gap: 12,
   },
   // Recipe Card
   recipeCard: {
@@ -371,8 +299,14 @@ const styles = StyleSheet.create({
   },
   recipeImageContainer: {
     width: '100%',
-    aspectRatio: 16 / 9,
+    aspectRatio: 2.2,
     backgroundColor: '#f5f1f0',
+    overflow: 'hidden',
+  },
+  recipeImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   recipeImagePlaceholder: {
     flex: 1,
@@ -381,10 +315,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF0E6',
   },
   recipeImageEmoji: {
-    fontSize: 64,
+    fontSize: 52,
   },
   recipeInfo: {
-    padding: 16,
+    padding: 12,
   },
   recipeHeader: {
     flexDirection: 'row',
@@ -398,14 +332,6 @@ const styles = StyleSheet.create({
     color: '#181210',
     flex: 1,
     marginRight: 8,
-  },
-  bookmarkIcon: {
-    fontSize: 20,
-    opacity: 0.3,
-  },
-  bookmarkIconActive: {
-    opacity: 1,
-    color: '#FF6B35',
   },
   cookingInfo: {
     flexDirection: 'row',
@@ -477,30 +403,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFFFFF',
   },
-  viewButtonTextMuted: {
-    color: '#FFFFFF',
-  },
   bottomSpacer: {
     height: 80,
-  },
-  // FAB
-  fab: {
-    position: 'absolute',
-    bottom: 32,
-    right: 16,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#FF6B35',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#FF6B35',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabIcon: {
-    fontSize: 24,
   },
 });
