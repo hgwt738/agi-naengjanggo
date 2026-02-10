@@ -3,6 +3,16 @@ import type {Ingredient} from '../types';
 
 const INGREDIENTS_KEY = '@ingredients';
 
+const DAY = 24 * 60 * 60 * 1000;
+
+const DEFAULT_INGREDIENTS: Ingredient[] = [
+  {id: '1', name: '브로콜리', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 7 * DAY)},
+  {id: '2', name: '고구마', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 21 * DAY)},
+  {id: '3', name: '닭가슴살', category: 'meat', addedAt: new Date(), expiresAt: new Date(Date.now() + 2 * DAY)},
+  {id: '4', name: '두부', category: 'other', addedAt: new Date(), expiresAt: new Date(Date.now() + 5 * DAY)},
+  {id: '5', name: '쌀', category: 'grain', addedAt: new Date(), expiresAt: new Date(Date.now() + 90 * DAY)},
+];
+
 export async function saveIngredients(ingredients: Ingredient[]) {
   try {
     const serialized = ingredients.map(item => ({
@@ -16,11 +26,12 @@ export async function saveIngredients(ingredients: Ingredient[]) {
   }
 }
 
-export async function loadIngredients(): Promise<Ingredient[] | null> {
+export async function loadIngredients(): Promise<Ingredient[]> {
   try {
     const stored = await AsyncStorage.getItem(INGREDIENTS_KEY);
     if (!stored) {
-      return null;
+      await saveIngredients(DEFAULT_INGREDIENTS);
+      return DEFAULT_INGREDIENTS;
     }
     const parsed = JSON.parse(stored);
     return parsed.map((item: any) => ({
@@ -30,7 +41,7 @@ export async function loadIngredients(): Promise<Ingredient[] | null> {
     }));
   } catch (error) {
     console.error('Failed to load ingredients:', error);
-    return null;
+    return [];
   }
 }
 
@@ -38,7 +49,8 @@ export async function getIngredientCount(): Promise<number> {
   try {
     const stored = await AsyncStorage.getItem(INGREDIENTS_KEY);
     if (!stored) {
-      return 0;
+      await saveIngredients(DEFAULT_INGREDIENTS);
+      return DEFAULT_INGREDIENTS.length;
     }
     return JSON.parse(stored).length;
   } catch (error) {

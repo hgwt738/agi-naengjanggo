@@ -7,18 +7,13 @@ import {
   TextInput,
   ScrollView,
   Modal,
+  Platform,
 } from 'react-native';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import type {Ingredient, IngredientCategory} from '../types';
 import {saveIngredients, loadIngredients} from '../utils/ingredientStorage';
-
-const SAMPLE_INGREDIENTS: Ingredient[] = [
-  {id: '1', name: '브로콜리', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)},
-  {id: '2', name: '고구마', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000)},
-  {id: '3', name: '닭가슴살', category: 'meat', addedAt: new Date(), expiresAt: new Date()},
-  {id: '4', name: '두부', category: 'other', addedAt: new Date(), expiresAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000)},
-  {id: '5', name: '퀴노아', category: 'grain', addedAt: new Date(), expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)},
-];
+import {getIngredientDetail} from '../constants/ingredientDetails';
 
 type QuickIngredient = {
   name: string;
@@ -35,37 +30,71 @@ const QUICK_INGREDIENTS: Record<IngredientCategory, QuickIngredient[]> = {
     {name: '애호박', category: 'vegetable'},
     {name: '양배추', category: 'vegetable'},
     {name: '양파', category: 'vegetable'},
+    {name: '단호박', category: 'vegetable'},
+    {name: '비트', category: 'vegetable'},
+    {name: '무', category: 'vegetable'},
+    {name: '토마토', category: 'vegetable'},
+    {name: '완두콩', category: 'vegetable'},
+    {name: '청경채', category: 'vegetable'},
+    {name: '파프리카', category: 'vegetable'},
+    {name: '옥수수', category: 'vegetable'},
+    {name: '콜리플라워', category: 'vegetable'},
+    {name: '오이', category: 'vegetable'},
   ],
   fruit: [
     {name: '사과', category: 'fruit'},
     {name: '바나나', category: 'fruit'},
     {name: '배', category: 'fruit'},
     {name: '아보카도', category: 'fruit'},
+    {name: '딸기', category: 'fruit'},
+    {name: '블루베리', category: 'fruit'},
+    {name: '수박', category: 'fruit'},
+    {name: '키위', category: 'fruit'},
+    {name: '망고', category: 'fruit'},
+    {name: '복숭아', category: 'fruit'},
+    {name: '포도', category: 'fruit'},
+    {name: '자두', category: 'fruit'},
   ],
   meat: [
     {name: '소고기', category: 'meat'},
     {name: '닭고기', category: 'meat'},
     {name: '돼지고기', category: 'meat'},
+    {name: '닭가슴살', category: 'meat'},
+    {name: '다진고기', category: 'meat'},
   ],
   fish: [
     {name: '흰살생선', category: 'fish'},
     {name: '연어', category: 'fish'},
     {name: '새우', category: 'fish'},
+    {name: '대구', category: 'fish'},
+    {name: '도미', category: 'fish'},
+    {name: '가자미', category: 'fish'},
+    {name: '멸치', category: 'fish'},
   ],
   dairy: [
     {name: '분유', category: 'dairy'},
     {name: '치즈', category: 'dairy'},
     {name: '요거트', category: 'dairy'},
+    {name: '우유', category: 'dairy'},
+    {name: '버터', category: 'dairy'},
   ],
   grain: [
     {name: '쌀', category: 'grain'},
     {name: '찹쌀', category: 'grain'},
     {name: '오트밀', category: 'grain'},
+    {name: '현미', category: 'grain'},
+    {name: '보리', category: 'grain'},
   ],
   other: [
     {name: '달걀', category: 'other'},
     {name: '두부', category: 'other'},
     {name: '참기름', category: 'other'},
+    {name: '김', category: 'other'},
+    {name: '미역', category: 'other'},
+    {name: '버섯', category: 'other'},
+    {name: '들기름', category: 'other'},
+    {name: '참깨', category: 'other'},
+    {name: '올리브오일', category: 'other'},
   ],
 };
 
@@ -74,9 +103,12 @@ type FilterTab = 'all' | IngredientCategory;
 const FILTER_TABS: {key: FilterTab; label: string}[] = [
   {key: 'all', label: '전체'},
   {key: 'vegetable', label: '채소'},
-  {key: 'meat', label: '단백질'},
-  {key: 'grain', label: '곡류'},
   {key: 'fruit', label: '과일'},
+  {key: 'meat', label: '육류'},
+  {key: 'fish', label: '생선'},
+  {key: 'dairy', label: '유제품'},
+  {key: 'grain', label: '곡류'},
+  {key: 'other', label: '기타'},
 ];
 
 const CATEGORY_EMOJI: Record<IngredientCategory, string> = {
@@ -88,6 +120,69 @@ const CATEGORY_EMOJI: Record<IngredientCategory, string> = {
   grain: '🌾',
   other: '🥄',
 };
+
+const INGREDIENT_EMOJI: Record<string, string> = {
+  // 채소
+  당근: '🥕', 감자: '🥔', 고구마: '🍠', 브로콜리: '🥦',
+  시금치: '🥬', 애호박: '🥒', 양배추: '🥗', 양파: '🧅',
+  단호박: '🎃', 비트: '🫒', 무: '🥔', 토마토: '🍅',
+  완두콩: '🫛', 청경채: '🥬', 파프리카: '🫑', 옥수수: '🌽',
+  콜리플라워: '🥦', 오이: '🥒',
+  // 과일
+  사과: '🍎', 바나나: '🍌', 배: '🍐', 아보카도: '🥑',
+  딸기: '🍓', 블루베리: '🫐', 수박: '🍉', 키위: '🥝',
+  망고: '🥭', 복숭아: '🍑', 포도: '🍇', 자두: '🍑',
+  // 육류
+  소고기: '🥩', 닭고기: '🍗', 돼지고기: '🥓',
+  닭가슴살: '🍗', 다진고기: '🥩',
+  // 생선
+  흰살생선: '🐟', 연어: '🍣', 새우: '🦐',
+  대구: '🐟', 도미: '🐟', 가자미: '🐟', 멸치: '🐟',
+  // 유제품
+  분유: '🍼', 치즈: '🧀', 요거트: '🥛', 우유: '🥛', 버터: '🧈',
+  // 곡류
+  쌀: '🍚', 찹쌀: '🍚', 오트밀: '🌾', 현미: '🍚', 보리: '🌾',
+  // 기타
+  달걀: '🥚', 두부: '🧈', 참기름: '🫗', 김: '🍃',
+  미역: '🍃', 버섯: '🍄', 들기름: '🫗', 참깨: '🥜', 올리브오일: '🫒',
+};
+
+const DEFAULT_EXPIRY_DAYS: Record<IngredientCategory, number> = {
+  vegetable: 7, fruit: 7, meat: 3, fish: 2,
+  dairy: 10, grain: 60, other: 14,
+};
+
+const INGREDIENT_EXPIRY_DAYS: Record<string, number> = {
+  // 채소 - 잎채소 (짧음)
+  시금치: 4, 청경채: 4, 양배추: 10,
+  // 채소 - 뿌리/열매 (길음)
+  감자: 21, 고구마: 21, 당근: 14, 무: 14,
+  단호박: 14, 양파: 21, 옥수수: 5,
+  비트: 14, 파프리카: 7, 오이: 5,
+  // 과일 - 베리류 (짧음)
+  딸기: 4, 블루베리: 5, 포도: 5,
+  // 과일 - 일반
+  바나나: 5, 복숭아: 5, 자두: 5, 수박: 5,
+  사과: 21, 배: 14, 키위: 14, 망고: 5,
+  아보카도: 5,
+  // 육류
+  소고기: 3, 닭고기: 2, 돼지고기: 3,
+  닭가슴살: 2, 다진고기: 2,
+  // 생선
+  흰살생선: 2, 연어: 2, 새우: 2,
+  대구: 2, 도미: 2, 가자미: 2, 멸치: 30,
+  // 유제품
+  분유: 30, 치즈: 21, 요거트: 10, 우유: 7, 버터: 30,
+  // 곡류
+  쌀: 90, 찹쌀: 90, 오트밀: 90, 현미: 60, 보리: 90,
+  // 기타
+  달걀: 21, 두부: 5, 참기름: 90, 김: 60,
+  미역: 60, 버섯: 5, 들기름: 90, 참깨: 90, 올리브오일: 90,
+};
+
+function getExpiryDays(name: string, category: IngredientCategory): number {
+  return INGREDIENT_EXPIRY_DAYS[name] ?? DEFAULT_EXPIRY_DAYS[category];
+}
 
 const ADD_CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
   {key: 'vegetable', label: '채소'},
@@ -106,49 +201,72 @@ export default function IngredientsScreen() {
   useEffect(() => {
     (async () => {
       const stored = await loadIngredients();
-      if (stored) {
-        setIngredients(stored);
-      } else {
-        setIngredients(SAMPLE_INGREDIENTS);
-        saveIngredients(SAMPLE_INGREDIENTS);
-      }
+      setIngredients(stored);
     })();
   }, []);
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>('all');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newIngredient, setNewIngredient] = useState('');
   const [addCategory, setAddCategory] = useState<IngredientCategory>('vegetable');
+  const [detailIngredient, setDetailIngredient] = useState<Ingredient | null>(null);
+  const [editingIngredientId, setEditingIngredientId] = useState<string | null>(null);
+  const [tempExpiryDate, setTempExpiryDate] = useState(new Date());
+  const [showEditDatePicker, setShowEditDatePicker] = useState(false);
+
+  const openEditDatePicker = (ingredient: Ingredient) => {
+    setEditingIngredientId(ingredient.id);
+    setTempExpiryDate(ingredient.expiresAt ? new Date(ingredient.expiresAt) : new Date());
+    setShowEditDatePicker(true);
+  };
+
+  const handleExpiryDateChange = (event: any, selectedDate?: Date) => {
+    if (Platform.OS === 'android') {
+      setShowEditDatePicker(false);
+      if (event.type === 'set' && selectedDate && editingIngredientId) {
+        const updated = ingredients.map(item =>
+          item.id === editingIngredientId
+            ? {...item, expiresAt: selectedDate}
+            : item,
+        );
+        setIngredients(updated);
+        saveIngredients(updated);
+      }
+      setEditingIngredientId(null);
+    } else {
+      if (selectedDate) {
+        setTempExpiryDate(selectedDate);
+      }
+    }
+  };
+
+  const confirmExpiryDate = () => {
+    if (editingIngredientId) {
+      const updated = ingredients.map(item =>
+        item.id === editingIngredientId
+          ? {...item, expiresAt: tempExpiryDate}
+          : item,
+      );
+      setIngredients(updated);
+      saveIngredients(updated);
+    }
+    setShowEditDatePicker(false);
+    setEditingIngredientId(null);
+  };
 
   const isIngredientAdded = (name: string) => {
     return ingredients.some(item => item.name === name);
-  };
-
-  const addIngredient = () => {
-    if (newIngredient.trim()) {
-      const ingredient: Ingredient = {
-        id: Date.now().toString(),
-        name: newIngredient.trim(),
-        category: addCategory,
-        addedAt: new Date(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      };
-      const updated = [...ingredients, ingredient];
-      setIngredients(updated);
-      saveIngredients(updated);
-      setNewIngredient('');
-    }
   };
 
   const addQuickIngredient = (quick: QuickIngredient) => {
     if (isIngredientAdded(quick.name)) {
       return;
     }
+    const days = getExpiryDays(quick.name, quick.category);
     const ingredient: Ingredient = {
       id: Date.now().toString(),
       name: quick.name,
       category: quick.category,
       addedAt: new Date(),
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + days * 24 * 60 * 60 * 1000),
     };
     const updated = [...ingredients, ingredient];
     setIngredients(updated);
@@ -185,14 +303,7 @@ export default function IngredientsScreen() {
 
     // 카테고리 필터
     if (selectedFilter !== 'all') {
-      if (selectedFilter === 'meat') {
-        // 단백질 = meat + fish + other(두부 등)
-        filtered = filtered.filter(item =>
-          item.category === 'meat' || item.category === 'fish' || item.category === 'other'
-        );
-      } else {
-        filtered = filtered.filter(item => item.category === selectedFilter);
-      }
+      filtered = filtered.filter(item => item.category === selectedFilter);
     }
 
     // 검색 필터
@@ -238,10 +349,7 @@ export default function IngredientsScreen() {
 
       {/* Filter Tabs */}
       <View style={styles.tabsContainer}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContent}>
+        <View style={styles.tabsContent}>
           {FILTER_TABS.map(tab => (
             <TouchableOpacity
               key={tab.key}
@@ -259,7 +367,7 @@ export default function IngredientsScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
       </View>
 
       {/* Content Area */}
@@ -277,10 +385,10 @@ export default function IngredientsScreen() {
               {items.map(item => {
                 const expiry = getExpiryStatus(item.expiresAt);
                 return (
-                  <View key={item.id} style={styles.ingredientCard}>
+                  <TouchableOpacity key={item.id} style={styles.ingredientCard} onPress={() => setDetailIngredient(item)} activeOpacity={0.7}>
                     <View style={styles.ingredientImage}>
                       <Text style={styles.ingredientEmoji}>
-                        {CATEGORY_EMOJI[item.category]}
+                        {INGREDIENT_EMOJI[item.name] || CATEGORY_EMOJI[item.category]}
                       </Text>
                     </View>
                     <View style={styles.ingredientInfo}>
@@ -293,7 +401,7 @@ export default function IngredientsScreen() {
                       </View>
                     </View>
                     <View style={styles.ingredientActions}>
-                      <TouchableOpacity style={styles.actionButton}>
+                      <TouchableOpacity style={styles.actionButton} onPress={() => openEditDatePicker(item)}>
                         <Text style={styles.editIcon}>✏️</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -302,7 +410,7 @@ export default function IngredientsScreen() {
                         <Text style={styles.deleteIcon}>✕</Text>
                       </TouchableOpacity>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })}
             </View>
@@ -329,62 +437,156 @@ export default function IngredientsScreen() {
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
 
+      {/* 식재료 상세 모달 */}
+      <Modal
+        visible={detailIngredient !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDetailIngredient(null)}>
+        <TouchableOpacity
+          style={styles.detailModalOverlay}
+          activeOpacity={1}
+          onPress={() => setDetailIngredient(null)}>
+          <View style={styles.detailModalContent} onStartShouldSetResponder={() => true}>
+            {detailIngredient && (() => {
+              const detail = getIngredientDetail(detailIngredient.name);
+              const expiry = getExpiryStatus(detailIngredient.expiresAt);
+              return (
+                <>
+                  <View style={styles.detailHeader}>
+                    <View style={styles.detailEmojiContainer}>
+                      <Text style={styles.detailEmoji}>
+                        {INGREDIENT_EMOJI[detailIngredient.name] || CATEGORY_EMOJI[detailIngredient.category]}
+                      </Text>
+                    </View>
+                    <Text style={styles.detailName}>{detailIngredient.name}</Text>
+                    <View style={[styles.detailExpiryBadge, {backgroundColor: expiry.color + '18'}]}>
+                      <Text style={styles.detailExpiryIcon}>{expiry.icon}</Text>
+                      <Text style={[styles.detailExpiryText, {color: expiry.color}]}>
+                        {expiry.text}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {detail ? (
+                    <ScrollView style={styles.detailBody} showsVerticalScrollIndicator={false}>
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>📦 보관 방법</Text>
+                        <Text style={styles.detailSectionText}>{detail.storage}</Text>
+                      </View>
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>🔪 손질 방법</Text>
+                        <Text style={styles.detailSectionText}>{detail.preparation}</Text>
+                      </View>
+                      <View style={styles.detailSection}>
+                        <Text style={styles.detailSectionTitle}>👶 이유식 팁</Text>
+                        <Text style={styles.detailSectionText}>{detail.tip}</Text>
+                      </View>
+                      {detail.allergy && (
+                        <View style={[styles.detailSection, styles.detailAllergySection]}>
+                          <Text style={styles.detailSectionTitle}>⚠️ 알레르기 주의</Text>
+                          <Text style={styles.detailAllergyText}>{detail.allergy}</Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  ) : (
+                    <View style={styles.detailBody}>
+                      <Text style={styles.detailNoInfo}>상세 정보가 아직 준비되지 않았어요</Text>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.detailCloseButton}
+                    onPress={() => setDetailIngredient(null)}>
+                    <Text style={styles.detailCloseButtonText}>닫기</Text>
+                  </TouchableOpacity>
+                </>
+              );
+            })()}
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* iOS 유효기한 수정 모달 */}
+      {Platform.OS === 'ios' && (
+        <Modal visible={showEditDatePicker} transparent animationType="slide">
+          <View style={styles.editModalOverlay}>
+            <View style={styles.editModalContent}>
+              <View style={styles.editModalHeader}>
+                <TouchableOpacity onPress={() => {
+                  setShowEditDatePicker(false);
+                  setEditingIngredientId(null);
+                }}>
+                  <Text style={styles.modalCancel}>취소</Text>
+                </TouchableOpacity>
+                <Text style={styles.modalTitle}>유효기한 수정</Text>
+                <TouchableOpacity onPress={confirmExpiryDate}>
+                  <Text style={styles.modalConfirm}>확인</Text>
+                </TouchableOpacity>
+              </View>
+              <View style={styles.editDatePickerContainer}>
+                <DateTimePicker
+                  value={tempExpiryDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleExpiryDateChange}
+                  minimumDate={new Date()}
+                  locale="ko-KR"
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
+
+      {/* Android 유효기한 수정 */}
+      {Platform.OS === 'android' && showEditDatePicker && (
+        <DateTimePicker
+          value={tempExpiryDate}
+          mode="date"
+          display="default"
+          onChange={handleExpiryDateChange}
+          minimumDate={new Date()}
+        />
+      )}
+
       {/* Add Ingredient Modal */}
       <Modal
         visible={showAddModal}
         transparent
         animationType="slide"
         onRequestClose={() => setShowAddModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAddModal(false)}>
+          <View style={styles.modalContent} onStartShouldSetResponder={() => true}>
             <View style={styles.modalHeader}>
-              <TouchableOpacity onPress={() => setShowAddModal(false)}>
-                <Text style={styles.modalCancel}>취소</Text>
-              </TouchableOpacity>
               <Text style={styles.modalTitle}>식재료 추가</Text>
-              <TouchableOpacity onPress={() => {
-                addIngredient();
-                setShowAddModal(false);
-              }}>
-                <Text style={styles.modalConfirm}>완료</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* 직접 입력 */}
-            <View style={styles.modalInputContainer}>
-              <TextInput
-                style={styles.modalInput}
-                value={newIngredient}
-                onChangeText={setNewIngredient}
-                placeholder="직접 입력하기"
-                placeholderTextColor="#999"
-              />
             </View>
 
             {/* 카테고리 탭 */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.modalCategoryTabs}
-              contentContainerStyle={styles.modalCategoryTabsContent}>
-              {ADD_CATEGORY_TABS.map(tab => (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[
-                    styles.modalCategoryTab,
-                    addCategory === tab.key && styles.modalCategoryTabActive,
-                  ]}
-                  onPress={() => setAddCategory(tab.key)}>
-                  <Text
+            <View style={styles.modalCategoryTabs}>
+              <View style={styles.modalCategoryTabsContent}>
+                {ADD_CATEGORY_TABS.map(tab => (
+                  <TouchableOpacity
+                    key={tab.key}
                     style={[
-                      styles.modalCategoryTabText,
-                      addCategory === tab.key && styles.modalCategoryTabTextActive,
-                    ]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+                      styles.modalCategoryTab,
+                      addCategory === tab.key && styles.modalCategoryTabActive,
+                    ]}
+                    onPress={() => setAddCategory(tab.key)}>
+                    <Text
+                      style={[
+                        styles.modalCategoryTabText,
+                        addCategory === tab.key && styles.modalCategoryTabTextActive,
+                      ]}>
+                      {tab.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             {/* 퀵 선택 버튼들 */}
             <ScrollView style={styles.quickScrollView}>
@@ -411,7 +613,7 @@ export default function IngredientsScreen() {
               </View>
             </ScrollView>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
     </SafeAreaView>
   );
@@ -470,8 +672,8 @@ const styles = StyleSheet.create({
     borderBottomColor: 'rgba(255, 228, 214, 0.2)',
   },
   tabsContent: {
-    paddingHorizontal: 16,
-    gap: 24,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
   },
   tab: {
     paddingVertical: 12,
@@ -647,8 +849,6 @@ const styles = StyleSheet.create({
     maxHeight: '80%',
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
     borderBottomWidth: 1,
@@ -668,25 +868,40 @@ const styles = StyleSheet.create({
     color: '#FF6B35',
     fontWeight: '600',
   },
-  modalInputContainer: {
-    padding: 16,
+  // Edit Expiry Modal
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
   },
-  modalInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
+  editModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 40,
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 16,
-    fontSize: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  editDatePickerContainer: {
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   modalCategoryTabs: {
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
   modalCategoryTabsContent: {
-    paddingHorizontal: 12,
-    gap: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-evenly',
   },
   modalCategoryTab: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 20,
   },
@@ -707,6 +922,7 @@ const styles = StyleSheet.create({
   quickButtons: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'center',
     padding: 16,
     gap: 8,
   },
@@ -733,5 +949,105 @@ const styles = StyleSheet.create({
   checkMark: {
     fontSize: 12,
     color: '#999',
+  },
+  // Detail Modal
+  detailModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  detailModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    paddingBottom: 40,
+  },
+  detailHeader: {
+    alignItems: 'center',
+    paddingTop: 28,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  detailEmojiContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF0E6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  detailEmoji: {
+    fontSize: 36,
+  },
+  detailName: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#181210',
+    marginBottom: 8,
+  },
+  detailExpiryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 4,
+  },
+  detailExpiryIcon: {
+    fontSize: 13,
+  },
+  detailExpiryText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  detailBody: {
+    paddingHorizontal: 24,
+    paddingTop: 20,
+  },
+  detailSection: {
+    marginBottom: 20,
+  },
+  detailSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#181210',
+    marginBottom: 6,
+  },
+  detailSectionText: {
+    fontSize: 14,
+    color: '#5a4a42',
+    lineHeight: 22,
+  },
+  detailAllergySection: {
+    backgroundColor: '#FEF2F2',
+    padding: 14,
+    borderRadius: 12,
+  },
+  detailAllergyText: {
+    fontSize: 14,
+    color: '#dc2626',
+    lineHeight: 22,
+  },
+  detailNoInfo: {
+    fontSize: 14,
+    color: '#8d6a5e',
+    textAlign: 'center',
+    paddingVertical: 24,
+  },
+  detailCloseButton: {
+    marginHorizontal: 24,
+    marginTop: 8,
+    backgroundColor: '#FF6B35',
+    borderRadius: 16,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  detailCloseButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
