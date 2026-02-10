@@ -14,10 +14,7 @@ import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../types/navigation';
 import type {Recipe, AgeGroup} from '../types';
 
-type RecipesScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'Recipes'
->;
+type RecipesScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Recipes'>;
 
 interface ExtendedRecipe extends Recipe {
   imageUrl?: string;
@@ -122,18 +119,7 @@ export default function RecipesScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top App Bar */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerIcon}>🧊</Text>
-        </View>
-        <Text style={styles.headerTitle}>아기 냉장고</Text>
-        <TouchableOpacity style={styles.headerRight}>
-          <Text style={styles.profileIcon}>👤</Text>
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView style={styles.container} edges={[]}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -280,27 +266,6 @@ export default function RecipesScreen() {
         <Text style={styles.fabIcon}>🛒</Text>
       </TouchableOpacity>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIconActive}>📖</Text>
-          <Text style={styles.navLabelActive}>레시피</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('Ingredients')}>
-          <Text style={styles.navIcon}>🧊</Text>
-          <Text style={styles.navLabel}>냉장고</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>📋</Text>
-          <Text style={styles.navLabel}>기록</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>⚙️</Text>
-          <Text style={styles.navLabel}>설정</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -309,37 +274,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-  },
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f5f1f0',
-  },
-  headerLeft: {
-    width: 48,
-  },
-  headerIcon: {
-    fontSize: 28,
-    color: '#FF6B35',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#181210',
-  },
-  headerRight: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  profileIcon: {
-    fontSize: 24,
   },
   // Search
   searchContainer: {
@@ -547,12 +481,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   bottomSpacer: {
-    height: 160,
+    height: 80,
   },
   // FAB
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 32,
     right: 16,
     width: 56,
     height: 56,
@@ -568,41 +502,5 @@ const styles = StyleSheet.create({
   },
   fabIcon: {
     fontSize: 24,
-  },
-  // Bottom Navigation
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderTopColor: '#f5f1f0',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navIcon: {
-    fontSize: 24,
-    opacity: 0.5,
-  },
-  navIconActive: {
-    fontSize: 24,
-  },
-  navLabel: {
-    fontSize: 10,
-    fontWeight: '500',
-    color: '#8d6a5e',
-  },
-  navLabelActive: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FF6B35',
   },
 });

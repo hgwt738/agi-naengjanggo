@@ -9,10 +9,7 @@ import {
   Modal,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
-import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {Ingredient, IngredientCategory} from '../types';
-import type {RootStackParamList} from '../types/navigation';
 import {saveIngredients, loadIngredients} from '../utils/ingredientStorage';
 
 const SAMPLE_INGREDIENTS: Ingredient[] = [
@@ -103,8 +100,6 @@ const ADD_CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
 ];
 
 export default function IngredientsScreen() {
-  const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -226,20 +221,7 @@ export default function IngredientsScreen() {
   }, [filteredIngredients]);
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Top Navigation Bar */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>내 냉장고</Text>
-        <TouchableOpacity style={styles.moreButton}>
-          <Text style={styles.moreIcon}>⋯</Text>
-        </TouchableOpacity>
-      </View>
-
+    <SafeAreaView style={styles.container} edges={[]}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
@@ -347,28 +329,6 @@ export default function IngredientsScreen() {
         <Text style={styles.fabIcon}>+</Text>
       </TouchableOpacity>
 
-      {/* Bottom Tab Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIconActive}>🧊</Text>
-          <Text style={styles.navLabelActive}>냉장고</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.navItem}
-          onPress={() => navigation.navigate('Recipes')}>
-          <Text style={styles.navIcon}>📖</Text>
-          <Text style={styles.navLabel}>레시피</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>🛒</Text>
-          <Text style={styles.navLabel}>장보기</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem}>
-          <Text style={styles.navIcon}>👤</Text>
-          <Text style={styles.navLabel}>프로필</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Add Ingredient Modal */}
       <Modal
         visible={showAddModal}
@@ -474,39 +434,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f6f5',
-  },
-  // Header
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  backButton: {
-    width: 48,
-    height: 48,
-    alignItems: 'flex-start',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 28,
-    color: '#181210',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#181210',
-  },
-  moreButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moreIcon: {
-    fontSize: 24,
-    color: '#181210',
   },
   // Search
   searchContainer: {
@@ -683,12 +610,12 @@ const styles = StyleSheet.create({
     color: '#8d6a5e',
   },
   bottomSpacer: {
-    height: 160,
+    height: 80,
   },
   // FAB
   fab: {
     position: 'absolute',
-    bottom: 100,
+    bottom: 32,
     right: 24,
     width: 64,
     height: 64,
@@ -706,42 +633,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: '#FFFFFF',
     fontWeight: '300',
-  },
-  // Bottom Navigation
-  bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: 12,
-    paddingBottom: 28,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 228, 214, 0.3)',
-  },
-  navItem: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  navIcon: {
-    fontSize: 24,
-    opacity: 0.5,
-  },
-  navIconActive: {
-    fontSize: 24,
-  },
-  navLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#8d6a5e',
-  },
-  navLabelActive: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FF6B35',
   },
   // Modal
   modalOverlay: {
