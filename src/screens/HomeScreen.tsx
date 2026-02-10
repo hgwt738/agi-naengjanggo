@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useState, useEffect, useCallback} from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {RootStackParamList} from '../types/navigation';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -22,6 +22,7 @@ import {
   getAgeGroupDescription,
   formatMonthsOld,
 } from '../utils/baby';
+import {getIngredientCount} from '../utils/ingredientStorage';
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -37,12 +38,21 @@ export default function HomeScreen() {
   const [babyPhoto, setBabyPhoto] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState(new Date());
-  const [ingredientCount] = useState(12); // TODO: 실제 식재료 개수와 연동
+  const [ingredientCount, setIngredientCount] = useState(0);
 
   useEffect(() => {
     loadBabyBirthDate();
     loadBabyPhoto();
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const count = await getIngredientCount();
+        setIngredientCount(count);
+      })();
+    }, []),
+  );
 
   const loadBabyBirthDate = async () => {
     try {
@@ -240,14 +250,16 @@ export default function HomeScreen() {
               </View>
 
               {/* 날짜 선택기 */}
-              <DateTimePicker
-                value={tempDate}
-                mode="date"
-                display="spinner"
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-                locale="ko-KR"
-              />
+              <View style={styles.datePickerContainer}>
+                <DateTimePicker
+                  value={tempDate}
+                  mode="date"
+                  display="spinner"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                  locale="ko-KR"
+                />
+              </View>
 
               {/* 버튼 영역 */}
               <View style={styles.modalButtons}>
@@ -489,6 +501,9 @@ const styles = StyleSheet.create({
     color: '#8d6a5e',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  datePickerContainer: {
+    alignItems: 'center',
   },
   modalButtons: {
     paddingHorizontal: 24,

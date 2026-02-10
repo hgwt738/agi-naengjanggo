@@ -1,4 +1,4 @@
-import React, {useState, useMemo} from 'react';
+import React, {useState, useMemo, useEffect} from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {useNavigation} from '@react-navigation/native';
 import type {NativeStackNavigationProp} from '@react-navigation/native-stack';
 import type {Ingredient, IngredientCategory} from '../types';
 import type {RootStackParamList} from '../types/navigation';
+import {saveIngredients, loadIngredients} from '../utils/ingredientStorage';
 
 const SAMPLE_INGREDIENTS: Ingredient[] = [
   {id: '1', name: '브로콜리', category: 'vegetable', addedAt: new Date(), expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)},
@@ -104,9 +105,20 @@ const ADD_CATEGORY_TABS: {key: IngredientCategory; label: string}[] = [
 export default function IngredientsScreen() {
   const navigation =
     useNavigation<NativeStackNavigationProp<RootStackParamList>>();
-  const [ingredients, setIngredients] =
-    useState<Ingredient[]>(SAMPLE_INGREDIENTS);
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      const stored = await loadIngredients();
+      if (stored) {
+        setIngredients(stored);
+      } else {
+        setIngredients(SAMPLE_INGREDIENTS);
+        saveIngredients(SAMPLE_INGREDIENTS);
+      }
+    })();
+  }, []);
   const [selectedFilter, setSelectedFilter] = useState<FilterTab>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [newIngredient, setNewIngredient] = useState('');
@@ -125,7 +137,9 @@ export default function IngredientsScreen() {
         addedAt: new Date(),
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
       };
-      setIngredients([...ingredients, ingredient]);
+      const updated = [...ingredients, ingredient];
+      setIngredients(updated);
+      saveIngredients(updated);
       setNewIngredient('');
     }
   };
@@ -141,11 +155,15 @@ export default function IngredientsScreen() {
       addedAt: new Date(),
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
     };
-    setIngredients([...ingredients, ingredient]);
+    const updated = [...ingredients, ingredient];
+    setIngredients(updated);
+    saveIngredients(updated);
   };
 
   const removeIngredient = (id: string) => {
-    setIngredients(ingredients.filter(item => item.id !== id));
+    const updated = ingredients.filter(item => item.id !== id);
+    setIngredients(updated);
+    saveIngredients(updated);
   };
 
   const getExpiryStatus = (expiresAt?: Date) => {
